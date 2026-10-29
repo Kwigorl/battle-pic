@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+def buildNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as Integer
+
+android {
+    namespace 'fr.servon.battlepic'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'fr.servon.battlepic'
+        minSdk 29
+        targetSdk 34
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    // Clé de signature fixe, fournie par les secrets GitHub (jamais dans le dépôt) :
+    // les mises à jour s'installent par-dessus l'ancienne version.
+    def keystorePath = System.getenv('BATTLEPIC_KEYSTORE')
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('BATTLEPIC_KEYSTORE_PASSWORD')
+                keyAlias 'battlepic'
+                keyPassword System.getenv('BATTLEPIC_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keystorePath ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
