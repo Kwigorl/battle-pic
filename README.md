@@ -4,6 +4,7 @@ Appli Android de la médiathèque de Servon-sur-Vilaine pour les photos du podca
 
 - Viseur en direct avec le cadre La Battle par-dessus (la photo remplace le vert).
 - Retardateur 3 s ou 10 s, caméra avant ou arrière, import depuis la galerie.
+- Textes des deux cases blanches (bouton « Écrire dans les cases »), dans la police du visuel (Urbanist), avec réglage de la taille ; ils s'affichent dès le viseur et restent en mémoire pour les photos suivantes.
 - Recadrage après la prise : glisser pour déplacer, pincer ou curseur pour zoomer.
 - Chaque photo est enregistrée en 2 versions 1080 × 1350 (format post Instagram), avec et sans filtre, dans l'album « Battle Pic » de la galerie.
 - Bouton « Partager » pour envoyer les 2 photos vers Canva, Drive, etc.
@@ -24,4 +25,4 @@ La clé de signature est rangée dans les secrets du dépôt (`BATTLEPIC_KEYSTOR
 
 - `app/src/main/assets/index.html` : l'interface (page web embarquée, cadre inclus).
 - `app/src/main/java/fr/servon/battlepic/MainActivity.java` : la coque Android (caméra, galerie, enregistrement, partage).
-- Polices Anton et Barlow (licence SIL OFL) dans `app/src/main/assets/fonts/`.
+- Polices Anton, Barlow et Urbanist (licence SIL OFL) dans `app/src/main/assets/fonts/`.
