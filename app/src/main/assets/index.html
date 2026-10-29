@@ -266,9 +266,10 @@ button { cursor: pointer; }
 
   let stream = null, facing = "environment", live = false, wantLive = true;
   let mode = "shoot", src = null, view = { z: 1, cx: W / 2, cy: H / 2 };
-  let timer = 0, counting = false, wake = null, busy = false, savedUris = null;
+  let timer = 0, counting = false, wake = null, busy = false, savedUris = null, previewFiltered = true;
 
-  try { const t = parseInt(localStorage.getItem("battle-timer"), 10); if ([0, 3, 10].includes(t)) timer = t; } catch (e) {}
+  /* À chaque ouverture, tout repart de zéro : on efface ce que les versions précédentes gardaient */
+  try { ["battle-timer", "battle-texts", "battle-texts-2", "battle-bw"].forEach((k) => localStorage.removeItem(k)); } catch (e) {}
 
   /* ---------- Interface ---------- */
   function setChip(text, isLive) { chipText.textContent = text; chip.classList.toggle("live", !!isLive); }
@@ -282,11 +283,12 @@ button { cursor: pointer; }
   pressGroup(timerBtns, "timer", timer);
   timerBtns.forEach((b) => b.addEventListener("click", () => {
     timer = parseInt(b.dataset.timer, 10); pressGroup(timerBtns, "timer", timer);
-    try { localStorage.setItem("battle-timer", String(timer)); } catch (e) {}
   }));
   const viewBtns = [...deckReview.querySelectorAll("[data-view]")];
   viewBtns.forEach((b) => b.addEventListener("click", () => {
-    setFrameVisible(b.dataset.view !== "off"); pressGroup(viewBtns, "view", b.dataset.view);
+    previewFiltered = b.dataset.view !== "off";
+    setFrameVisible(previewFiltered); pressGroup(viewBtns, "view", b.dataset.view);
+    const keep = savedUris; render(); savedUris = keep; /* changer d'aperçu ne change pas les photos déjà enregistrées */
   }));
 
   function setFrameVisible(on) { overlay.hidden = textsCanvas.hidden = vsLayer.hidden = !on; }
@@ -304,16 +306,8 @@ button { cursor: pointer; }
   const BOX_SIZE = 42; /* taille du texte d'origine : capitales de ~30 px */
   const BOX_FONT = '"Urbanist", "Barlow", "Helvetica Neue", Arial, sans-serif';
   const blankTexts = () => ({ left: ["", ""], right: ["", ""], sizes: { left: [100, 100], right: [100, 100] } });
-  let texts = blankTexts();
-  try {
-    const t = JSON.parse(localStorage.getItem("battle-texts-2") || "null");
-    if (t && t.left && t.right && t.sizes) texts = t;
-    else {
-      const old = JSON.parse(localStorage.getItem("battle-texts") || "null");
-      if (old && typeof old.left === "string") { texts.left[0] = old.left; texts.right[0] = old.right || ""; }
-    }
-  } catch (e) {}
-  function saveTexts() { try { localStorage.setItem("battle-texts-2", JSON.stringify(texts)); } catch (e) {} }
+  let texts = blankTexts();      /* gardés tant que l'appli est ouverte, vides à la réouverture */
+  function saveTexts() {}
   const linesOf = (side) => texts[side].map((t, i) => ({ text: String(t || "").toLocaleUpperCase("fr-FR").trim(), scale: (texts.sizes[side][i] || 100) / 100 })).filter((l) => l.text);
 
   function boxRect(side, n) { const b = BOXES[side]; return { x0: b.x0, x1: b.x1, y0: b.top, y1: b.top + (n === 2 ? 100 : 80) }; }
@@ -392,7 +386,7 @@ button { cursor: pointer; }
   }
   function openTexts() {
     (mode === "review" ? deckReview : deckShoot).hidden = true; deckTexts.hidden = false;
-    setFrameVisible(true); pressGroup(viewBtns, "view", "on");
+    previewFiltered = true; setFrameVisible(true); pressGroup(viewBtns, "view", "on");
     frame.classList.add("boxes");
     loadSide(activeSide);
     txtLine1.focus();
@@ -444,7 +438,6 @@ button { cursor: pointer; }
     return t;
   });
   let bw = 100;
-  try { const v = parseInt(localStorage.getItem("battle-bw"), 10); if (v >= 0 && v <= 100) bw = v; } catch (e) {}
   function applyLook(canvas, k) {
     if (k <= 0) return;
     const x = canvas.getContext("2d");
@@ -469,7 +462,6 @@ button { cursor: pointer; }
   }
   bwInput.addEventListener("input", () => {
     bw = parseInt(bwInput.value, 10) || 0; showBw(); updateLivePreview();
-    try { localStorage.setItem("battle-bw", String(bw)); } catch (e) {}
     clearTimeout(bwTimer); bwTimer = setTimeout(rebuildFiltered, 60);
   });
   showBw(); updateLivePreview();
@@ -477,7 +469,7 @@ button { cursor: pointer; }
   function showShoot() {
     mode = "shoot"; src = null;
     deckReview.hidden = true; deckShoot.hidden = false;
-    photo.hidden = true; setFrameVisible(true); pressGroup(viewBtns, "view", "on");
+    photo.hidden = true; previewFiltered = true; setFrameVisible(true); pressGroup(viewBtns, "view", "on");
     deckTexts.hidden = true; frame.classList.remove("boxes"); rawSrc = null;
     frame.classList.remove("editing"); frame.removeAttribute("tabindex");
     if (wantLive) startCamera(); else setFallbackUI();
@@ -648,14 +640,16 @@ button { cursor: pointer; }
     view.cx = Math.min(dw / 2, Math.max(W - dw / 2, view.cx));
     view.cy = Math.min(dh / 2, Math.max(H - dh / 2, view.cy));
   }
-  function drawPhoto(ctx) {
+  /* source = photo noir et blanc (src) pour la version avec filtre, photo d'origine (rawSrc) sinon */
+  function drawPhoto(ctx, source) {
+    const img = source || src;
     const { dw, dh } = geom();
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(src, view.cx - dw / 2, view.cy - dh / 2, dw, dh);
+    ctx.drawImage(img, view.cx - dw / 2, view.cy - dh / 2, dw, dh);
   }
   let raf = 0;
-  function render() { savedUris = null; if (raf || !src) return; raf = requestAnimationFrame(() => { raf = 0; if (src) drawPhoto(photo.getContext("2d")); }); }
+  function render() { savedUris = null; if (raf || !src) return; raf = requestAnimationFrame(() => { raf = 0; if (src) drawPhoto(photo.getContext("2d"), previewFiltered ? src : (rawSrc || src)); }); }
   function zoomAt(mx, my, z) {
     const old = geom().s;
     view.z = Math.min(4, Math.max(1, z));
@@ -715,7 +709,7 @@ button { cursor: pointer; }
   function makeBlob(withOverlay) {
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const x = c.getContext("2d");
-    drawPhoto(x);
+    drawPhoto(x, withOverlay ? src : (rawSrc || src));
     if (withOverlay) { x.drawImage(overlay, 0, 0, W, H); x.drawImage(textsCanvas, 0, 0, W, H); x.drawImage(vsLayer, 0, 0, W, H); }
     return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("export"))), "image/jpeg", 0.92));
   }
